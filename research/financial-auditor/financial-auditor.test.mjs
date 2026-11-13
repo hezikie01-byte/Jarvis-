@@ -48,3 +48,30 @@ test('reports mismatch between received counter and payment history', () => {
   }]);
   assert.equal(result.findings.some(item => item.code === 'RECEIVED_COUNT_MISMATCH'), true);
 });
+
+test('accepts the current app seed shape, including an undated legacy receipt', () => {
+  const result = auditInvestmentDeals([{
+    id: 'weekly-declining', title: 'Weekly loan', kind: 'declining',
+    principal: 1700, payment: 170, cadence: 'weekly', dueLabel: 'Thursday',
+    received: 1, remaining: 11, source: 'Reinvested proceeds',
+    history: [{ amount: 170, note: 'First receipt' }]
+  }]);
+  assert.equal(result.status, 'completed');
+  assert.equal(result.findings.some(item => item.severity === 'critical'), false);
+  assert.equal(result.findings.some(item => item.code === 'INVALID_DEAL_FIELD'), false);
+  assert.equal(result.findings.some(item => item.code === 'UNCLASSIFIED_PAYMENT'), true);
+});
+
+test('validates app-specific deal fields and payment note types', () => {
+  const result = auditInvestmentDeals([{
+    id: 'bad-shape', title: '', kind: 'other', principal: 10, payment: 1,
+    cadence: 'daily', dueLabel: 'Today', received: 0, remaining: -1,
+    source: 'test', history: [{ amount: 1, note: 42 }]
+  }]);
+  const codes = result.findings.map(item => item.code);
+  assert.equal(codes.includes('INVALID_DEAL_FIELD'), true);
+  assert.equal(codes.includes('INVALID_DEAL_KIND'), true);
+  assert.equal(codes.includes('INVALID_DEAL_CADENCE'), true);
+  assert.equal(codes.includes('INVALID_REMAINING_COUNT'), true);
+  assert.equal(codes.includes('INVALID_PAYMENT_NOTE'), true);
+});

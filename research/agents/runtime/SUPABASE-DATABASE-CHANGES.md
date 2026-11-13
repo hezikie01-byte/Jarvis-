@@ -5,8 +5,8 @@ Project: \`Jarvis\` (\`twfzosqjcupiwfuithmb\`), region \`ap-southeast-2\`.
 ## Applied migrations
 - \`20261113191532 jarvis_agent_runtime_foundation_v1\`
 - \`20261113191610 jarvis_agent_read_context_rpc_v1\`
-- \`20261113191640 jarvis_agent_prompts_and_owner_guard_v1\`
-- \`202611131917xx jarvis_agent_usage_atomic_rpc_v1\` (exact version is recorded in Supabase migration history)
+- \`20261113191644 jarvis_agent_prompts_and_owner_guard_v1\`
+- \`20261113191925 jarvis_agent_usage_atomic_rpc_v1\`
 
 ## Runtime tables
 - \`jarvis_agent_registry\`: seven configured roles, explicit model IDs, token caps, tool allowlists and denied actions.

@@ -1,7 +1,7 @@
 export const AGENTS = Object.freeze({
   manager: { modelId: 'gpt-6.1-sol', reasoningEffort: 'medium', domain: 'routing' },
   financial_data_auditor: { modelId: 'gpt-6.1-sol', reasoningEffort: 'high', domain: 'financial_audit' },
-  deal_performance_analyst: { modelId: 'gpt-6.1-sol', reasoningEffort: 'medium', domain: 'deal_analysis' },
+  deal_performance_analyst: { modelId: 'gpt-6.1-sol', reasoningEffort: 'high', domain: 'deal_analysis' },
   cashflow_forecaster: { modelId: 'gpt-6-luna', reasoningEffort: 'low', domain: 'cashflow' },
   research_opportunity_scout: { modelId: 'gpt-6.1-sol', reasoningEffort: 'medium', domain: 'research' },
   product_code_guardian: { modelId: 'gpt-6.1-sol', reasoningEffort: 'high', domain: 'code_review' },
@@ -19,6 +19,7 @@ const RATES = Object.freeze({
 const isRecord = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const arr = v => Array.isArray(v) ? v : [];
 const str = (v, n = 240) => typeof v === 'string' ? v.slice(0, n) : '';
+const finiteOrNull = v => v === null || v === undefined || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
 
 export function resolveAgent({ agentKey, domain }) {
   const key = agentKey && agentKey !== 'manager' ? agentKey : ROUTE_BY_DOMAIN[domain];
@@ -30,15 +31,15 @@ export function buildAgentContext(state, domain, suppliedMaterial = '') {
   const s = isRecord(state) ? state : {};
   const transactions = arr(s.transactions).filter(x => isRecord(x) && x.origin !== 'synthetic').slice(-500).map(x => ({
     id: x.id ?? null, kind: x.kind ?? null, category: str(x.category, 100),
-    amount: Number.isFinite(Number(x.amount)) ? Number(x.amount) : null,
+    amount: finiteOrNull(x.amount),
     date: str(x.date, 40) || null, origin: x.origin ?? 'unknown', note: str(x.note, 180),
   }));
   const deals = arr(s.investmentDeals).slice(0, 100).filter(isRecord).map(d => ({
     id: d.id ?? null, title: str(d.title || d.name, 120), type: str(d.type || d.dealType, 60),
-    status: str(d.status, 40), currency: str(d.currency, 3) || 'ILS',
-    principal: Number.isFinite(Number(d.principal ?? d.amount ?? d.invested)) ? Number(d.principal ?? d.amount ?? d.invested) : null,
+    status: str(d.status, 40), currency: str(d.currency, 3) || null,
+    principal: finiteOrNull(d.principal ?? d.amount ?? d.invested),
     history: arr(d.history).slice(-100).filter(isRecord).map(h => ({
-      amount: Number.isFinite(Number(h.amount)) ? Number(h.amount) : null,
+      amount: finiteOrNull(h.amount),
       date: str(h.date, 40) || null, type: str(h.type, 40) || null, status: str(h.status, 30) || null,
     })),
   }));
@@ -83,13 +84,17 @@ export function sanitizeAgentResult(text) {
   try {
     const parsed = JSON.parse(raw);
     if (!isRecord(parsed)) throw new Error('not_object');
-    return {
-      summary: str(parsed.summary, 1800), findings: arr(parsed.findings).slice(0, 30),
-      evidence: arr(parsed.evidence).slice(0, 50),
-      confidence: Number.isFinite(Number(parsed.confidence)) ? Math.max(0, Math.min(1, Number(parsed.confidence))) : null,
-      proposed_actions: arr(parsed.proposed_actions).slice(0, 20).map(a => ({ ...a, execution_state: 'not_executed', approval_required: true })),
-      format: 'structured',
+    const roleFields = ['forecast_periods','assumptions','risks','per_deal_findings','metrics','anomalies','upcoming_items','conflicts','suggestions','source_citations','tests_required','proposed_patch','specialist'];
+    const normalizedFindings = arr(parsed.findings).length ? arr(parsed.findings) : roleFields.flatMap(k => arr(parsed[k]));
+    const confidence = parsed.confidence === null || parsed.confidence === undefined || parsed.confidence === '' ? null : (Number.isFinite(Number(parsed.confidence)) ? Math.max(0, Math.min(1, Number(parsed.confidence))) : null);
+    const proposedActions = arr(parsed.proposed_actions).filter(isRecord).slice(0, 20).map(a => ({ ...a, execution_state: 'not_executed', approval_required: true }));
+    const result = {
+      summary: str(parsed.summary, 1800), findings: normalizedFindings.slice(0, 30),
+      evidence: arr(parsed.evidence).slice(0, 50), confidence,
+      proposed_actions: proposedActions, format: 'structured',
     };
+    for (const key of roleFields) if (Object.hasOwn(parsed, key)) result[key] = parsed[key];
+    return result;
   } catch {
     return { summary: raw, findings: [], evidence: [], confidence: null, proposed_actions: [], format: 'plain_text' };
   }

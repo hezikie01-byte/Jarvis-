@@ -4,7 +4,7 @@
  * evidence-backed anomalies only. Never mutates or repairs input.
  */
 const VALID_CLASSIFICATIONS = new Set(['principal', 'interest', 'mixed', 'unknown']);
-const DATE_RE = /^\\d{4}-\\d{2}-\\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function finding(code, severity, dealId, message, evidence = {}) {
   return { code, severity, dealId, message, evidence };
 }

@@ -78,3 +78,21 @@ test('specialist-specific output fields survive normalization', () => {
   assert.equal(r.proposed_actions.length, 1);
   assert.equal(r.proposed_actions[0].execution_state, 'not_executed');
 });
+
+test('nested model outputs are depth, width and string bounded', () => {
+  const huge = 'x'.repeat(5000);
+  const r = sanitizeAgentResult(JSON.stringify({
+    summary: 'bounded', metrics: [{ label: huge, deep: { a: { b: { c: { d: 'too deep' } } } } }],
+    proposed_actions: [{ type: 'reminder', details: huge }]
+  }));
+  assert.equal(r.metrics[0].label.length, 1200);
+  assert.equal(r.metrics[0].deep.a.b.c, undefined);
+  assert.equal(r.proposed_actions[0].details.length, 1200);
+  assert.equal(r.proposed_actions[0].execution_state, 'not_executed');
+});
+test('financial audit stats and operations context are bounded', () => {
+  const audit = buildAgentContext({ stats: { note: 'x'.repeat(5000) } }, 'financial_audit');
+  assert.equal(audit.stats.note.length, 1200);
+  const ops = buildAgentContext({ tasks: [{ payload: Array.from({ length: 80 }, (_, i) => i) }] }, 'operations');
+  assert.equal(ops.tasks[0].payload.length, 30);
+});

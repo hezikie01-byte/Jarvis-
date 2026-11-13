@@ -38,7 +38,7 @@ export async function runJarvisAgent(input: {
   const config = Array.isArray(configRows) ? configRows[0] : null;
   const prompt = Array.isArray(promptRows) ? promptRows[0] : null;
   if (!config || !config.enabled || !prompt?.system_prompt) throw new Error('agent_not_configured');
-  if (config.model_id !== agent.modelId) throw new Error('model_registry_mismatch');
+  if (config.model_id !== agent.modelId || config.reasoning_effort !== agent.reasoningEffort) throw new Error('model_registry_mismatch');
 
   const context = buildAgentContext(input.state || {}, input.domain, input.material || '');
   const fingerprintBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ task, context })));

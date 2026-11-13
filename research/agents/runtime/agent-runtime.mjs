@@ -20,6 +20,21 @@ const isRecord = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const arr = v => Array.isArray(v) ? v : [];
 const str = (v, n = 240) => typeof v === 'string' ? v.slice(0, n) : '';
 const finiteOrNull = v => v === null || v === undefined || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
+function boundedJson(value, depth = 0) {
+  if (value === null || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') return value.slice(0, 1200);
+  if (depth >= 4) return undefined;
+  if (Array.isArray(value)) return value.slice(0, 30).map(v => boundedJson(v, depth + 1)).filter(v => v !== undefined);
+  if (!isRecord(value)) return undefined;
+  const out = {};
+  for (const [key, item] of Object.entries(value).slice(0, 30)) {
+    if (['__proto__', 'prototype', 'constructor'].includes(key)) continue;
+    const safe = boundedJson(item, depth + 1);
+    if (safe !== undefined) out[key.slice(0, 80)] = safe;
+  }
+  return out;
+}
 
 export function resolveAgent({ agentKey, domain }) {
   const key = agentKey && agentKey !== 'manager' ? agentKey : ROUTE_BY_DOMAIN[domain];
@@ -44,10 +59,10 @@ export function buildAgentContext(state, domain, suppliedMaterial = '') {
     })),
   }));
   const common = { domain, dataQuality: 'Synthetic/demo transactions excluded. Missing dates, currencies and classifications remain unknown; no inferred values.' };
-  if (domain === 'financial_audit') return { ...common, transactions, deals, stats: isRecord(s.stats) ? s.stats : null };
+  if (domain === 'financial_audit') return { ...common, transactions, deals, stats: isRecord(s.stats) ? boundedJson(s.stats) : null };
   if (domain === 'deal_analysis') return { ...common, deals };
   if (domain === 'cashflow') return { ...common, transactions: transactions.filter(x => x.date), deals, recurringRules: arr(s.recurringRules).slice(0, 100) };
-  if (domain === 'operations') return { ...common, events: arr(s.events).filter(isRecord).slice(0, 100), tasks: arr(s.tasks).filter(isRecord).slice(0, 150) };
+  if (domain === 'operations') return { ...common, events: arr(s.events).filter(isRecord).slice(0, 100).map(x => boundedJson(x)), tasks: arr(s.tasks).filter(isRecord).slice(0, 150).map(x => boundedJson(x)) };
   if (domain === 'research' || domain === 'code_review') return { ...common, suppliedMaterial: str(suppliedMaterial, 12000) };
   throw new TypeError('unsupported_domain');
 }
@@ -85,15 +100,16 @@ export function sanitizeAgentResult(text) {
     const parsed = JSON.parse(raw);
     if (!isRecord(parsed)) throw new Error('not_object');
     const roleFields = ['forecast_periods','assumptions','risks','per_deal_findings','metrics','anomalies','upcoming_items','conflicts','suggestions','source_citations','tests_required','proposed_patch','specialist'];
-    const normalizedFindings = arr(parsed.findings).length ? arr(parsed.findings) : roleFields.flatMap(k => arr(parsed[k]));
+    const safeRoleFields = Object.fromEntries(roleFields.filter(k => Object.hasOwn(parsed, k)).map(k => [k, boundedJson(parsed[k])]));
+    const normalizedFindings = arr(parsed.findings).length ? arr(parsed.findings).map(v => boundedJson(v)).filter(v => v !== undefined) : roleFields.flatMap(k => arr(safeRoleFields[k]));
     const confidence = parsed.confidence === null || parsed.confidence === undefined || parsed.confidence === '' ? null : (Number.isFinite(Number(parsed.confidence)) ? Math.max(0, Math.min(1, Number(parsed.confidence))) : null);
-    const proposedActions = arr(parsed.proposed_actions).filter(isRecord).slice(0, 20).map(a => ({ ...a, execution_state: 'not_executed', approval_required: true }));
+    const proposedActions = arr(parsed.proposed_actions).slice(0, 20).map(a => boundedJson(a)).filter(isRecord).map(a => ({ ...a, execution_state: 'not_executed', approval_required: true }));
     const result = {
       summary: str(parsed.summary, 1800), findings: normalizedFindings.slice(0, 30),
-      evidence: arr(parsed.evidence).slice(0, 50), confidence,
+      evidence: arr(parsed.evidence).slice(0, 50).map(v => boundedJson(v)).filter(v => v !== undefined), confidence,
       proposed_actions: proposedActions, format: 'structured',
     };
-    for (const key of roleFields) if (Object.hasOwn(parsed, key)) result[key] = parsed[key];
+    for (const [key, value] of Object.entries(safeRoleFields)) if (value !== undefined) result[key] = value;
     return result;
   } catch {
     return { summary: raw, findings: [], evidence: [], confidence: null, proposed_actions: [], format: 'plain_text' };

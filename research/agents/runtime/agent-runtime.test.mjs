@@ -26,10 +26,11 @@ test('deal history is bounded to the latest 100 records', () => {
   const c = buildAgentContext({ investmentDeals: [{ principal: 1000, history }] }, 'deal_analysis');
   assert.equal(c.deals[0].history.length, 100);
 });
-test('Responses request pins model and caps output tokens', () => {
+test('Responses request pins model, caps output tokens and disables server storage', () => {
   const r = buildResponsesRequest({ modelId: 'gpt-6.1-sol', systemPrompt: 'Read-only', task: 'Audit', context: {}, maxOutputTokens: 9000 });
   assert.equal(r.model, 'gpt-6.1-sol');
   assert.equal(r.max_output_tokens, 4000);
+  assert.equal(r.store, false);
 });
 test('unknown model is rejected', () => {
   assert.throws(() => buildResponsesRequest({ modelId: 'made-up', systemPrompt: 'x', task: 'y', context: {} }), /unpriced_or_unapproved_model/);

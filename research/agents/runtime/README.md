@@ -17,7 +17,7 @@
 | Product & Code Guardian | gpt-6.1-sol | code, security and QA review |
 | Personal Operations Assistant | gpt-6-luna | reminders, calendar and tasks |
 
-GPT-6.1 Terra is reserved for future visual intake. GPT-6 Astra is an escalation model, not a default call.
+GPT-6.1 Terra is reserved for future visual intake. GPT-6 Astra is an escalation model, not a default call. The manager profile is a routing/orchestration role and is not directly callable through the specialist runtime yet.
 
 ## Runtime rules
 1. Authenticate the owner and use a fixed agent/domain allowlist.

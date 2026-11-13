@@ -86,7 +86,7 @@ test('nested model outputs are depth, width and string bounded', () => {
     proposed_actions: [{ type: 'reminder', details: huge }]
   }));
   assert.equal(r.metrics[0].label.length, 1200);
-  assert.equal(r.metrics[0].deep.a.b.c, undefined);
+  assert.deepEqual(r.metrics[0].deep.a, {});
   assert.equal(r.proposed_actions[0].details.length, 1200);
   assert.equal(r.proposed_actions[0].execution_state, 'not_executed');
 });

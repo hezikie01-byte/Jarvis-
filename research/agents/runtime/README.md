@@ -11,13 +11,13 @@
 |---|---|---|
 | Manager | gpt-6.1-sol | deterministic routing now; cross-agent synthesis later |
 | Financial Data Auditor | gpt-6.1-sol | reconciliation and anomaly review |
-| Deal Performance Analyst | gpt-6.1-sol | deal metrics and repayment analysis |
+| Deal Performance Analyst | gpt-6.1-sol (high reasoning) | deal metrics and repayment analysis |
 | Cash-flow Forecaster | gpt-6-luna | bounded forecast explanations |
 | Research & Opportunity Scout | gpt-6.1-sol | sourced research |
 | Product & Code Guardian | gpt-6.1-sol | code, security and QA review |
 | Personal Operations Assistant | gpt-6-luna | reminders, calendar and tasks |
 
-GPT-6.1 Terra is reserved for future visual intake. GPT-6 Astra is an escalation model, not a default call. The manager profile is a routing/orchestration role and is not directly callable through the specialist runtime yet.
+GPT-6.1 Terra is reserved for future visual intake. GPT-6 Astra is an escalation model, not a default call. The manager profile is disabled until deterministic dispatch, evidence merging, and approval gates are implemented and tested.
 
 ## Runtime rules
 1. Authenticate the owner and use a fixed agent/domain allowlist.

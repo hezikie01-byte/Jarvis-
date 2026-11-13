@@ -55,3 +55,26 @@ test('plain text fallback preserves model output without fabricated structure', 
 test('cost estimation uses model-specific input and output rates', () => {
   assert.equal(estimateCostUsd('gpt-6-luna', { input_tokens: 1000, output_tokens: 500 }), 0.00035);
 });
+
+test('missing financial values remain unknown instead of becoming zero or ILS', () => {
+  const c = buildAgentContext({
+    transactions: [{ amount: null, origin: 'manual' }],
+    investmentDeals: [{ principal: null, currency: null, history: [{ amount: null }] }]
+  }, 'financial_audit');
+  assert.equal(c.transactions[0].amount, null);
+  assert.equal(c.deals[0].principal, null);
+  assert.equal(c.deals[0].currency, null);
+  assert.equal(c.deals[0].history[0].amount, null);
+});
+test('specialist-specific output fields survive normalization', () => {
+  const r = sanitizeAgentResult(JSON.stringify({
+    summary: 'Forecast ready', forecast_periods: [{ period: 'week-1' }],
+    assumptions: ['confirmed dates only'], confidence: null,
+    proposed_actions: [{ type: 'remind' }, 'invalid']
+  }));
+  assert.equal(r.forecast_periods[0].period, 'week-1');
+  assert.equal(r.findings[0].period, 'week-1');
+  assert.equal(r.confidence, null);
+  assert.equal(r.proposed_actions.length, 1);
+  assert.equal(r.proposed_actions[0].execution_state, 'not_executed');
+});

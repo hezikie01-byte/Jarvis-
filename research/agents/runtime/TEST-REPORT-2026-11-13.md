@@ -37,7 +37,8 @@ The updated runtime and test suite were executed in an isolated Node.js v22.16.0
 - Output normalization previously preserved specialist-specific fields without bounding nested payloads. This is now bounded to depth 4, 30 entries/items per level and 1,200 characters per string.
 - Audit stats and operations events/tasks now receive the same nested bounds.
 - The real Dropbox document was used as test input only; no Dropbox files were changed.
-- The manager remains disabled until real dispatch and evidence-merging behavior is implemented.
+- Six specialist prompt v2 drafts were staged in Supabase with status `draft`; the v1 prompts remain active until live evaluation passes.
+- The manager remains disabled in the agent registry until real dispatch and evidence-merging behavior is implemented.
 - OpenAI and Supabase secret-entry forms remain pending. No live model calls were made.
 - Dropbox gateway is not yet implemented; this simulation passed one real document through the runtime's bounded source-material path.
 - No AppDeploy route integration, finance-data migration, or production deployment occurred.

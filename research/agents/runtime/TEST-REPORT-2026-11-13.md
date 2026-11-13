@@ -1,7 +1,7 @@
 # Agent Runtime Simulation Report — 2026-11-13 (expanded)
 
 ## Result
-<badge>21 passed / 0 failed</badge>
+**21 passed / 0 failed**
 
 The updated runtime and test suite were executed in an isolated Node.js v22.16.0 environment. The test source was taken from the research branch; the run did not call any live AI API and did not modify the live AppDeploy application.
 

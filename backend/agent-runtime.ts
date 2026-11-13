@@ -8,7 +8,6 @@ const SUPABASE_URL = 'https://twfzosqjcupiwfuithmb.supabase.co';
 
 async function supabaseRequest(key: string, path: string, init: RequestInit = {}) {
   const headers: Record<string, string> = { apikey: key, 'Content-Type': 'application/json', ...(init.headers as Record<string, string> || {}) };
-  // New sb_secret keys are API keys, not JWTs; never send them as Bearer tokens.
   if (!key.startsWith('sb_secret_')) headers.Authorization = 'Bearer ' + key;
   const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, { ...init, headers });
   const body = await response.text();
@@ -32,20 +31,18 @@ export async function runJarvisAgent(input: {
     secrets.readSecret('SUPABASE_SERVICE_ROLE_KEY'),
   ]);
 
-  const configRows = await supabaseRequest(supabaseKey,
-    'jarvis_agent_registry?agent_key=eq.' + encodeURIComponent(agent.key) + '&select=*');
-  const promptRows = await supabaseRequest(supabaseKey,
-    'jarvis_agent_prompt_versions?agent_key=eq.' + encodeURIComponent(agent.key) + '&status=eq.active&select=version,system_prompt&limit=1');
+  const [configRows, promptRows] = await Promise.all([
+    supabaseRequest(supabaseKey, 'jarvis_agent_registry?agent_key=eq.' + encodeURIComponent(agent.key) + '&select=*'),
+    supabaseRequest(supabaseKey, 'jarvis_agent_prompt_versions?agent_key=eq.' + encodeURIComponent(agent.key) + '&status=eq.active&select=version,system_prompt&limit=1'),
+  ]);
   const config = Array.isArray(configRows) ? configRows[0] : null;
   const prompt = Array.isArray(promptRows) ? promptRows[0] : null;
   if (!config || !config.enabled || !prompt?.system_prompt) throw new Error('agent_not_configured');
   if (config.model_id !== agent.modelId) throw new Error('model_registry_mismatch');
 
   const context = buildAgentContext(input.state || {}, input.domain, input.material || '');
-  const fingerprintBytes = await crypto.subtle.digest('SHA-256',
-    new TextEncoder().encode(JSON.stringify({ task, context })));
-  const fingerprint = Array.from(new Uint8Array(fingerprintBytes))
-    .map(x => x.toString(16).padStart(2, '0')).join('');
+  const fingerprintBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ task, context })));
+  const fingerprint = Array.from(new Uint8Array(fingerprintBytes)).map(x => x.toString(16).padStart(2, '0')).join('');
 
   const runRows = await supabaseRequest(supabaseKey, 'jarvis_agent_runs', {
     method: 'POST', headers: { Prefer: 'return=representation' },
@@ -84,6 +81,24 @@ export async function runJarvisAgent(input: {
         estimated_cost_usd: cost, finished_at: new Date().toISOString(),
       }),
     });
+
+    let usageLogged = false;
+    try {
+      await supabaseRequest(supabaseKey, 'rpc/jarvis_agent_record_usage', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          p_usage_date: new Date().toISOString().slice(0, 10),
+          p_agent_key: agent.key, p_model_id: agent.modelId,
+          p_input_tokens: Number(usage.input_tokens) || 0,
+          p_output_tokens: Number(usage.output_tokens) || 0,
+          p_estimated_cost_usd: cost,
+        }),
+      });
+      usageLogged = true;
+    } catch {
+      // Keep the successful model result; the run row still contains per-call usage.
+    }
+
     if (result.proposed_actions.length) {
       await supabaseRequest(supabaseKey, 'jarvis_agent_decisions', {
         method: 'POST', headers: { Prefer: 'return=minimal' },
@@ -98,7 +113,7 @@ export async function runJarvisAgent(input: {
     return {
       runId, agentKey: agent.key, modelId: agent.modelId, promptVersion: prompt.version,
       result, usage: { inputTokens: Number(usage.input_tokens) || 0, outputTokens: Number(usage.output_tokens) || 0 },
-      estimatedCostUsd: cost,
+      estimatedCostUsd: cost, usageLogged,
     };
   } catch (cause) {
     await supabaseRequest(supabaseKey, 'jarvis_agent_runs?id=eq.' + encodeURIComponent(runId), {
